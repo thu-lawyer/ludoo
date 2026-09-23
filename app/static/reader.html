@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读 · 律读</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/reader.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231f4e5f'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='serif' font-weight='700'>律</text></svg>">
+</head>
+<body>
+  <div class="reader">
+    <!-- 顶栏 -->
+    <header class="reader-top">
+      <button class="btn icon" id="back-btn" title="返回文献库">←</button>
+      <span class="doc-title" id="top-title"></span>
+      <span class="spacer"></span>
+      <span class="reading-pct" id="pct">0%</span>
+      <button class="btn icon" id="font-dec" title="减小字号">A－</button>
+      <button class="btn icon" id="font-inc" title="增大字号">A＋</button>
+      <button class="btn icon" id="ai-btn" title="AI 摘要">✦ 摘要</button>
+      <button class="btn icon" id="theme-toggle" title="夜间模式">☾</button>
+      <button class="btn icon" id="panel-toggle" title="批注 / 目录 / 法条 侧栏">☰</button>
+    </header>
+
+    <div class="reader-body" id="reader-body">
+      <!-- 正文 -->
+      <div class="content-scroll" id="content-scroll">
+        <article class="article" id="article"></article>
+      </div>
+
+      <!-- 右侧栏 -->
+      <aside class="side-panel">
+        <div class="panel-tabs">
+          <button class="tab active" data-pane="toc">目录</button>
+          <button class="tab" data-pane="ann">批注</button>
+          <button class="tab" data-pane="law">法条</button>
+          <button class="tab" data-pane="info">信息</button>
+        </div>
+        <div class="panel-body" id="panel-body"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="/js/reader.js"></script>
+</body>
+</html>

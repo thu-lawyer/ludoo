@@ -1,0 +1,258 @@
+/* ============ 文献库页 ============ */
+
+.library { display: flex; height: 100vh; overflow: hidden; }
+
+/* ---------- 左侧栏 ---------- */
+.side {
+  width: 236px;
+  flex-shrink: 0;
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 16px;
+}
+.side .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 16px;
+}
+.brand-mark {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+}
+.brand h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.04em; }
+.brand .sub { font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.14em; margin-top: 1px; }
+
+.side-scroll { flex: 1; overflow-y: auto; padding: 0 12px; }
+.side-label { font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.1em; padding: 16px 8px 6px; }
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 7.5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.side-item:hover { background: var(--line-soft); color: var(--ink); }
+.side-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.side-item .count { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+.side-item.active .count { color: var(--accent); }
+
+.side-stats {
+  margin: 14px 12px 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  justify-content: space-between;
+  text-align: center;
+}
+.side-stats b { display: block; font-size: 17px; font-family: var(--serif); color: var(--accent); }
+.side-stats span { font-size: 11px; color: var(--ink-3); }
+
+.ai-status {
+  margin: 12px 12px 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--line-soft);
+  font-size: 12px;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ai-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+.ai-status.on .dot { background: #5c9e6d; }
+
+/* ---------- 主区 ---------- */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 26px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.searchbox {
+  flex: 1;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 8px 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.searchbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.searchbox svg { flex-shrink: 0; opacity: 0.45; }
+.searchbox input { border: none; outline: none; background: none; flex: 1; font-size: 14px; }
+.searchbox input::placeholder { color: var(--ink-3); }
+
+/* 文献卡片列表 */
+.doc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 26px 40px;
+}
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+}
+
+.doc-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s;
+  position: relative;
+}
+.doc-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+
+.doc-card .head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.src-badge { font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: 600; letter-spacing: 0.03em; }
+.src-badge.pdf { background: #f4e3e0; color: #9c4a38; }
+.src-badge.docx { background: #e3ecf4; color: #3d6a94; }
+.src-badge.web { background: #e4f0e5; color: #4a7d55; }
+.src-badge.text { background: var(--line-soft); color: var(--ink-2); }
+[data-theme="dark"] .src-badge.pdf { background: #4a2f28; }
+[data-theme="dark"] .src-badge.docx { background: #2b3d4d; }
+[data-theme="dark"] .src-badge.web { background: #2d4130; }
+
+.doc-card h3 {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.doc-card .meta { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 6px; flex-wrap: wrap; }
+.doc-card .snippet {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.doc-card .foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-3);
+  border-top: 1px solid var(--line-soft);
+  padding-top: 9px;
+}
+.progress-track { flex: 1; height: 3px; border-radius: 3px; background: transparent; overflow: hidden; }
+.doc-card:hover .progress-track { background: var(--line-soft); }
+.progress-fill { height: 100%; background: var(--gold); border-radius: 3px; }
+
+.star-btn {
+  position: absolute;
+  top: 12px; right: 12px;
+  font-size: 15px;
+  color: var(--ink-3);
+  padding: 4px;
+  border-radius: 5px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-card:hover .star-btn { opacity: 1; }
+.star-btn.on { opacity: 1; color: var(--gold); }
+.star-btn:hover { background: var(--line-soft); }
+
+/* 搜索结果 */
+.search-results { display: flex; flex-direction: column; gap: 10px; max-width: 780px; }
+.hit {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.hit:hover { border-color: var(--accent); }
+.hit .t { font-family: var(--serif); font-weight: 700; font-size: 15px; margin-bottom: 3px; display: flex; gap: 8px; align-items: center; }
+.hit .s { font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+.hit mark { background: var(--hl-重点); color: inherit; padding: 0 2px; border-radius: 2px; }
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 90px 20px;
+  color: var(--ink-3);
+}
+.empty .glyph { font-family: var(--serif); font-size: 44px; color: var(--ink-3); opacity: 0.5; }
+.empty h2 { font-family: var(--serif); font-size: 19px; color: var(--ink-2); margin: 14px 0 6px; }
+.empty p { font-size: 13.5px; }
+
+/* 上传拖放区 */
+.dropzone {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.dropzone:hover, .dropzone.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dropzone .big { font-size: 15px; color: var(--ink); margin-bottom: 5px; }
+.dropzone input[type="file"] { display: none; }
+
+/* 标签编辑 chips */
+.tag-editor { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); min-height: 38px; align-items: center; }
+.tag-editor .chip { cursor: pointer; }
+.tag-editor .chip .x { margin-left: 2px; font-size: 13px; opacity: 0.6; }
+.tag-editor .chip .x:hover { opacity: 1; }
+.tag-editor input { border: none; outline: none; background: none; flex: 1; min-width: 90px; font-size: 13px; padding: 2px; }
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.tag-suggest .chip { cursor: pointer; opacity: 0.75; font-size: 11.5px; }
+.tag-suggest .chip:hover { opacity: 1; }
+
+/* 引用格式 */
+.citation-box {
+  background: var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--ink);
+  word-break: break-all;
+}

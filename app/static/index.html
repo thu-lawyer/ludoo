@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>律读 · 法学文献阅读器</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/library.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231f4e5f'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='serif' font-weight='700'>律</text></svg>">
+</head>
+<body>
+  <div class="library">
+    <!-- 侧栏 -->
+    <aside class="side">
+      <div class="brand">
+        <div class="brand-mark">律</div>
+        <div>
+          <h1>律读</h1>
+          <div class="sub">LUDOO · 法学文献阅读器</div>
+        </div>
+      </div>
+      <div class="side-scroll">
+        <div class="side-label">文献库</div>
+        <button class="side-item active" data-filter="all">🗂 全部文献 <span class="count" id="cnt-all"></span></button>
+        <button class="side-item" data-filter="starred">★ 星标文献</button>
+        <div class="side-label">部门法标签</div>
+        <div id="tag-list"></div>
+        <div class="side-stats" id="stats"></div>
+        <div class="ai-status" id="ai-status"><span class="dot"></span><span>AI 辅助</span></div>
+      </div>
+    </aside>
+
+    <!-- 主区 -->
+    <main class="main">
+      <div class="topbar">
+        <div class="searchbox">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search-input" type="text" placeholder="全文检索：标题、正文、批注…">
+        </div>
+        <div class="spacer"></div>
+        <button class="btn icon" id="theme-toggle" title="夜间模式">☾</button>
+        <button class="btn primary" id="import-btn">＋ 导入文献</button>
+      </div>
+      <div class="doc-list" id="doc-list"></div>
+    </main>
+  </div>
+
+  <script type="module" src="/js/library.js"></script>
+</body>
+</html>
