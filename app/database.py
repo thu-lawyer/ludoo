@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS documents (
     word_count INTEGER DEFAULT 0,
     progress REAL DEFAULT 0,
     ai_summary TEXT DEFAULT '',
+    ai_report TEXT DEFAULT '',           -- JSON: {score,issues[],summary,keywords[],checked_at}
+    order_backup TEXT DEFAULT '',        -- JSON: AI 修复顺序时保存的原排列，用于回退
     created_at TEXT DEFAULT '',
     updated_at TEXT DEFAULT ''
 );
@@ -39,6 +41,12 @@ CREATE TABLE IF NOT EXISTS annotations (
 );
 CREATE INDEX IF NOT EXISTS idx_annotations_doc ON annotations(document_id);
 """
+
+# 老库升级：新增列（已存在则忽略）
+_MIGRATIONS = (
+    "ALTER TABLE documents ADD COLUMN ai_report TEXT DEFAULT ''",
+    "ALTER TABLE documents ADD COLUMN order_backup TEXT DEFAULT ''",
+)
 
 
 def now() -> str:
@@ -61,13 +69,19 @@ def init_db() -> None:
     config.ensure_dirs()
     with get_db() as db:
         db.executescript(_SCHEMA)
+        for ddl in _MIGRATIONS:
+            try:
+                db.execute(ddl)
+            except sqlite3.OperationalError:  # 列已存在
+                pass
 
 
 # ---------- 文档 ----------
 
 _DOC_COLUMNS = (
     "id, title, source_type, source_url, file_path, author, year, publication, "
-    "tags, starred, blocks, statutes, word_count, progress, ai_summary, created_at, updated_at"
+    "tags, starred, blocks, statutes, word_count, progress, ai_summary, "
+    "ai_report, order_backup, created_at, updated_at"
 )
 
 
@@ -80,6 +94,8 @@ def _doc_to_dict(row: sqlite3.Row, with_blocks: bool = True) -> dict:
     else:
         d.pop("blocks", None)
     d["statutes"] = json.loads(d.get("statutes") or "[]")
+    for k in ("ai_report", "order_backup"):
+        d[k] = json.loads(d[k]) if d.get(k) else None
     return d
 
 
@@ -96,7 +112,8 @@ def _snippet(blocks_json: str, limit: int = 120) -> str:
 def list_documents(q: str = "", tag: str = "", starred: bool | None = None) -> list[dict]:
     sql = (
         f"SELECT d.id, d.title, d.source_type, d.source_url, d.author, d.year, d.publication, "
-        "d.tags, d.starred, d.statutes, d.word_count, d.progress, d.created_at, d.updated_at, "
+        "d.tags, d.starred, d.statutes, d.word_count, d.progress, d.ai_report, "
+        "d.created_at, d.updated_at, "
         "d.blocks, "
         "(SELECT COUNT(*) FROM annotations a WHERE a.document_id = d.id) AS ann_count "
         "FROM documents d"
@@ -160,8 +177,8 @@ def update_document(doc_id: int, fields: dict) -> bool:
         return False
     sets, params = [], []
     for k, v in fields.items():
-        if k in ("tags", "blocks", "statutes"):
-            v = json.dumps(v, ensure_ascii=False)
+        if k in ("tags", "blocks", "statutes", "ai_report", "order_backup"):
+            v = json.dumps(v, ensure_ascii=False) if v is not None else ""
         sets.append(f"{k} = ?")
         params.append(v)
     sets.append("updated_at = ?")

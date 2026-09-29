@@ -3,7 +3,7 @@ import re
 import shutil
 import uuid
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -84,7 +84,7 @@ class ExplainIn(BaseModel):
     context: str = ""
 
 
-# ---------- 导入 ----------
+# ---------- 导入（含导入后的 AI 质检+元数据后台任务） ----------
 
 def _finalize(parsed: dict, source_url: str = "", file_path: str = "") -> dict:
     blocks, statutes = annotate_blocks(parsed["blocks"])
@@ -107,8 +107,35 @@ def _finalize(parsed: dict, source_url: str = "", file_path: str = "") -> dict:
     }
 
 
+def _ai_postimport(doc_id: int) -> None:
+    """导入完成后台执行：AI 质检 + 元数据补全（静默失败，不阻塞导入）。"""
+    if not config.llm_configured():
+        return
+    try:
+        doc = database.get_document(doc_id)
+        if not doc:
+            return
+        report = llm.check_doc_quality(doc["title"], doc["blocks"], doc["word_count"])
+        report["checked_at"] = database.now()
+        fields: dict = {"ai_report": report}
+        try:
+            meta = llm.extract_meta("\n".join(b.get("text", "") for b in doc["blocks"][:8]))
+            report["keywords"] = [str(k)[:12] for k in (meta.get("keywords") or [])][:6]
+            if not doc["author"] and meta.get("author"):
+                fields["author"] = str(meta["author"])[:60]
+            if not doc["year"] and str(meta.get("year") or "").strip()[:4].isdigit():
+                fields["year"] = str(meta["year"]).strip()[:4]
+            if not doc["publication"] and meta.get("publication"):
+                fields["publication"] = str(meta["publication"])[:60]
+        except Exception:  # 元数据失败不影响质检结果
+            pass
+        database.update_document(doc_id, fields)
+    except Exception:
+        pass
+
+
 @app.post("/api/documents/upload")
-def upload_document(file: UploadFile = File(...)):
+def upload_document(background: BackgroundTasks, file: UploadFile = File(...)):
     name = file.filename or "upload"
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if ext not in ("pdf", "docx"):
@@ -129,11 +156,12 @@ def upload_document(file: UploadFile = File(...)):
         raise HTTPException(422, f"解析失败：{e}") from e
     doc = _finalize(parsed, file_path=dest.name)
     doc_id = database.create_document(doc)
+    background.add_task(_ai_postimport, doc_id)
     return {"id": doc_id, "title": doc["title"], "statutes": len(doc["statutes"])}
 
 
 @app.post("/api/documents/url")
-def import_url(body: UrlIn):
+def import_url(background: BackgroundTasks, body: UrlIn):
     try:
         parsed = parse_url(body.url.strip())
     except ValueError as e:
@@ -142,17 +170,19 @@ def import_url(body: UrlIn):
         raise HTTPException(422, f"网页解析失败：{e}") from e
     doc = _finalize(parsed, source_url=parsed.get("meta", {}).get("source_url", body.url))
     doc_id = database.create_document(doc)
+    background.add_task(_ai_postimport, doc_id)
     return {"id": doc_id, "title": doc["title"], "statutes": len(doc["statutes"])}
 
 
 @app.post("/api/documents/text")
-def import_text(body: TextIn):
+def import_text(background: BackgroundTasks, body: TextIn):
     try:
         parsed = parse_text(body.title, body.text)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     doc = _finalize(parsed)
     doc_id = database.create_document(doc)
+    background.add_task(_ai_postimport, doc_id)
     return {"id": doc_id, "title": doc["title"], "statutes": len(doc["statutes"])}
 
 
@@ -243,6 +273,69 @@ def del_annotation(ann_id: int):
 @app.get("/api/ai/status")
 def ai_status():
     return {"configured": config.llm_configured(), "model": config.LLM_MODEL}
+
+
+def _require_llm() -> None:
+    if not config.llm_configured():
+        raise HTTPException(400, "未配置 API Key：请将 .env.example 复制为 .env 并填入 ZHIPU_API_KEY")
+
+
+@app.post("/api/documents/{doc_id}/quality-check")
+def ai_quality_check(doc_id: int):
+    """手动（重）跑解析质检；保留旧关键词。"""
+    _require_llm()
+    doc = database.get_document(doc_id)
+    if not doc:
+        raise HTTPException(404, "文献不存在")
+    try:
+        report = llm.check_doc_quality(doc["title"], doc["blocks"], doc["word_count"])
+    except Exception as e:
+        raise HTTPException(502, f"质检失败：{e}") from e
+    report["checked_at"] = database.now()
+    old_kw = (doc.get("ai_report") or {}).get("keywords") or []
+    report.setdefault("keywords", old_kw)
+    database.update_document(doc_id, {"ai_report": report})
+    return report
+
+
+@app.post("/api/documents/{doc_id}/repair-order")
+def ai_repair_order(doc_id: int):
+    """AI 修复阅读顺序：只重排块，不改文字；保存原排列可回退。"""
+    _require_llm()
+    doc = database.get_document(doc_id)
+    if not doc:
+        raise HTTPException(404, "文献不存在")
+    blocks = doc["blocks"]
+    if len(blocks) < 3:
+        raise HTTPException(400, "文本块过少，无需修复顺序")
+    try:
+        perm = llm.repair_block_order(blocks)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        raise HTTPException(502, f"修复失败：{e}") from e
+    if perm == list(range(len(blocks))):
+        return {"changed": False, "message": "AI 认为当前顺序正确，未做修改"}
+    new_blocks = [blocks[i] for i in perm]
+    database.update_document(doc_id, {"blocks": new_blocks, "order_backup": perm})
+    return {"changed": True, "backup": perm}
+
+
+@app.post("/api/documents/{doc_id}/revert-order")
+def ai_revert_order(doc_id: int):
+    """回退到 AI 修复前的原始块顺序。"""
+    doc = database.get_document(doc_id)
+    if not doc:
+        raise HTTPException(404, "文献不存在")
+    backup = doc.get("order_backup")
+    blocks = doc["blocks"]
+    if not backup or sorted(backup) != list(range(len(blocks))):
+        raise HTTPException(404, "没有可回退的顺序记录")
+    original = [None] * len(blocks)
+    for new_idx, old_idx in enumerate(backup):
+        original[old_idx] = blocks[new_idx]
+    database.update_document(doc_id, {"blocks": original, "order_backup": None})
+    return {"ok": True}
 
 
 @app.post("/api/documents/{doc_id}/summarize")

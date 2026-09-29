@@ -64,6 +64,9 @@ export const api = {
   aiExplain: (text, context = "") => request("/api/ai/explain", {
     method: "POST", body: JSON.stringify({ text, context }),
   }),
+  qualityCheck: (docId) => request(`/api/documents/${docId}/quality-check`, { method: "POST" }),
+  repairOrder: (docId) => request(`/api/documents/${docId}/repair-order`, { method: "POST" }),
+  revertOrder: (docId) => request(`/api/documents/${docId}/revert-order`, { method: "POST" }),
 };
 
 export function apiErr(e) {

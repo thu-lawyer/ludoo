@@ -60,6 +60,17 @@ function renderCards(docs) {
   list.replaceChildren(el("div", { class: "doc-grid" }, ...docs.map(docCard)));
 }
 
+function qualityBadge(rep) {
+  if (!rep || rep.score == null) return null;
+  const ok = rep.score >= 4;  // 模型给 4 分时常附带小问题，≥4 即视为通过
+  const tip = rep.issues?.length
+    ? `：${rep.issues.slice(0, 2).join("；")}` : "";
+  return el("span", {
+    class: "chip" + (ok ? "" : " gold"),
+    title: `AI 解析质检 ${rep.score}/5${ok ? "" : tip}`,
+  }, ok ? "✓ 质检" : "⚠ 待优化");
+}
+
 function docCard(d) {
   const meta = [d.author, d.year, d.publication].filter(Boolean).join(" · ");
   const pct = Math.round((d.progress || 0) * 100);
@@ -80,6 +91,7 @@ function docCard(d) {
       el("span", { class: `src-badge ${d.source_type}` }, SRC_LABEL[d.source_type] || d.source_type),
       ...d.tags.map((t) => el("span", { class: "chip" }, esc(t))),
       d.statutes.length ? el("span", { class: "chip gold", title: "文中识别到的法条引用" }, `⚖ ${d.statutes.length}`) : null,
+      qualityBadge(d.ai_report),
     ),
     el("h3", {}, esc(d.title)),
     meta ? el("div", { class: "meta" }, esc(meta)) : null,

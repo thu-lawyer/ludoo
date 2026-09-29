@@ -31,10 +31,10 @@ def parse_url(url: str) -> dict:
 
     html = _decoded(resp)
 
-    # 正文：markdown 结构（不带元数据头，避免混入 title/url 等杂行）
+    # 正文：markdown 结构（favor_recall 最大化召回，保留表格）
     downloaded = trafilatura.extract(
-        html, output_format="markdown", include_links=False, include_tables=False,
-        include_comments=False, url=resp.url, with_metadata=False,
+        html, output_format="markdown", include_links=False, include_tables=True,
+        include_comments=False, url=resp.url, with_metadata=False, favor_recall=True,
     )
     if not downloaded or len(downloaded.strip()) < 60:
         raise ValueError("未能从该网页提取到正文（可能需要登录或是动态渲染页面）")
@@ -85,23 +85,43 @@ def _clean_title(t: str) -> str:
     return t.strip()
 
 
-_FURNITURE = "订阅|已订阅|已收藏|收藏|小字号|大字号|点击播报|播报本文|本文[，,]?约|切换|朗读|举报|我要留言|相关阅读|延伸阅读"
-_FURNITURE_RUN = re.compile(rf"[*·|｜,，\s]*(?:{_FURNITURE})[*·|｜,，\s]*")
+_FURNITURE_WORDS = (
+    "订阅|已订阅|已收藏|收藏|小字号|大字号|点击播报|播报本文|本文[，,]?约|"
+    "切换|朗读|举报|我要留言|相关阅读|延伸阅读|分享到|分享|点赞|打赏|"
+    "关注|打开客户端|体验更多服务|客户端"
+)
+
+
+def _is_furniture_line(t: str) -> bool:
+    """整行只由页面家具词与分隔符构成才判为家具；正文行内出现这些词不受影响。"""
+    import re
+
+    remain = re.sub(rf"(?:{_FURNITURE_WORDS})", "", t)
+    return not re.search(r"[\u4e00-\u9fffA-Za-z0-9]", remain)
 
 
 def _markdown_to_blocks(md: str) -> list[dict]:
-    """把 trafilatura 的 markdown 输出转为结构化块（忽略图片/链接语法与页面家具文字）。"""
+    """markdown → 结构化块：保留表格（单元格拼接），行级剔除页面家具，两字标题不丢。"""
     import re
 
     md = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", md)          # 图片
     md = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", md)      # 链接保留文字
-    md = re.sub(r"\*{1,2}([^*\n]{1,12})\*{1,2}", r"\1", md)  # 粗斜体标记
-    md = _FURNITURE_RUN.sub(" ", md)                      # 订阅/收藏/字号等页面按钮文字
-    md = re.sub(r"[ \t]{2,}", " ", md)
+    md = re.sub(r"\*{1,2}([^*\n]+)\*{1,2}", r"\1", md)    # 粗斜体标记
+
     blocks: list[dict] = []
     for line in md.splitlines():
         t = line.strip()
-        if not t or t in ("---", "***") or len(t) <= 2:
+        # 表格行：单元格以「｜」拼接为文本块，跳过分隔行
+        if t.startswith("|") and t.count("|") >= 2:
+            cells = [c.strip() for c in t.strip("|").split("|")]
+            if all(re.fullmatch(r"[-: ]*", c) for c in cells):
+                continue
+            t = " ｜ ".join(c for c in cells if c)
+        if not t or t in ("---", "***"):
+            continue
+        if not re.search(r"[\u4e00-\u9fffA-Za-z0-9]", t):  # 纯标点/符号行
+            continue
+        if _is_furniture_line(t):
             continue
         if t.startswith("###"):
             blocks.append({"type": "h3", "text": t.lstrip("#").strip()})

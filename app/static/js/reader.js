@@ -354,6 +354,82 @@ async function renderInfoPane() {
   };
   citType.onchange = update;
 
+  // AI 解析质检区：报告 + 关键词 + 顺序修复
+  const qualitySection = buildQualitySection();
+
+  function buildQualitySection() {
+    const box = el("div", { class: "field" });
+    const render = (rep, orderBackup) => {
+      const recheckBtn = el("button", {
+        class: "btn small", onclick: async (ev) => {
+          const btn = ev.target;
+          btn.disabled = true; btn.textContent = "检测中…";
+          try {
+            const r = await api.qualityCheck(docId);
+            doc.ai_report = r;
+            render(r, doc.order_backup);
+            toast("✓ 质检完成");
+          } catch (e) { apiErr(e); btn.disabled = false; btn.textContent = "重新检测"; }
+        },
+      }, aiOn ? "重新检测" : "AI 质检（未配置）");
+      if (!aiOn) recheckBtn.disabled = true;
+
+      box.replaceChildren(el("label", {}, "解析质检（AI）"), el("div", { class: "row", style: "margin-bottom:8px" }, recheckBtn));
+
+      if (!rep) {
+        box.append(el("div", { class: "muted small" }, aiOn ? "尚未检测，点击「重新检测」开始。" : "未配置 API Key，质检不可用。"));
+        return;
+      }
+      const stars = "★".repeat(rep.score) + "☆".repeat(5 - rep.score);
+      box.append(el("div", { class: "small", style: "margin-bottom:6px" },
+        el("span", { style: "color:var(--gold);letter-spacing:2px" }, stars),
+        el("span", { class: "muted" }, `  ${rep.score}/5 · ${(rep.summary || "").slice(0, 40)}`)));
+      for (const issue of rep.issues || []) {
+        box.append(el("div", { class: "small", style: "color:var(--danger);margin:2px 0" }, `· ${esc(issue)}`));
+      }
+      if (rep.keywords?.length) {
+        box.append(el("div", { class: "tag-suggest", style: "margin:8px 0" },
+          ...rep.keywords.map((k) => el("span", {
+            class: "chip", title: "点击加入标签",
+            onclick: async () => {
+              if (doc.tags.includes(k)) return toast("已有该标签");
+              try {
+                await api.patchDoc(docId, { tags: [...doc.tags, k] });
+                doc.tags.push(k);
+                toast(`✓ 已添加标签「${k}」`);
+              } catch (e) { apiErr(e); }
+            },
+          }, `+ ${esc(k)}`))));
+      }
+      if (rep.issues?.some((i) => /乱序|顺序/.test(i)) && !orderBackup) {
+        const repairBtn = el("button", {
+          class: "btn small", style: "margin-top:6px",
+          onclick: async (ev) => {
+            const btn = ev.target;
+            btn.disabled = true; btn.textContent = "AI 修复中…";
+            try {
+              const r = await api.repairOrder(docId);
+              if (r.changed) { toast("✓ 已按 AI 建议重排段落，可「恢复原顺序」回退"); setTimeout(() => location.reload(), 900); }
+              else { toast(r.message || "AI 认为顺序正确"); btn.disabled = false; btn.textContent = "AI 修复阅读顺序"; }
+            } catch (e) { apiErr(e); btn.disabled = false; btn.textContent = "AI 修复阅读顺序"; }
+          },
+        }, "AI 修复阅读顺序");
+        box.append(el("div", {}, repairBtn));
+      }
+      if (orderBackup) {
+        box.append(el("button", {
+          class: "btn small danger", style: "margin-top:6px",
+          onclick: async () => {
+            try { await api.revertOrder(docId); toast("已恢复原顺序"); setTimeout(() => location.reload(), 700); }
+            catch (e) { apiErr(e); }
+          },
+        }, "↩ 恢复原顺序"));
+      }
+    };
+    render(doc.ai_report, doc.order_backup);
+    return box;
+  }
+
   body.replaceChildren(el("div", { class: "info-rows" },
     el("div", { class: "info-kv" }, el("span", { class: "k" }, "来源"), el("span", { class: "v" }, SRC_LABEL[doc.source_type] || doc.source_type)),
     doc.source_url ? el("div", { class: "info-kv" }, el("span", { class: "k" }, "原文链接"),
@@ -361,6 +437,7 @@ async function renderInfoPane() {
     el("div", { class: "info-kv" }, el("span", { class: "k" }, "字数"), el("span", { class: "v" }, `${doc.word_count} 字`)),
     el("div", { class: "info-kv" }, el("span", { class: "k" }, "批注"), el("span", { class: "v" }, `${annotations.length} 条`)),
     el("div", { class: "info-kv" }, el("span", { class: "k" }, "导入时间"), el("span", { class: "v" }, fmtDate(doc.created_at))),
+    qualitySection,
     mkInput("author", "作者", doc.author || ""),
     el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:10px" },
       mkInput("year", "年份", doc.year || ""), mkInput("publication", "期刊/出处", doc.publication || "")),
